@@ -11,3 +11,5 @@ __pycache__/
 /comp_data
 explanation.md
 *.obo
+*.fasta
+*.gz
