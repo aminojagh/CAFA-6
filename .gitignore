@@ -10,3 +10,4 @@ __pycache__/
 # competition data
 /comp_data
 explanation.md
+*.obo
