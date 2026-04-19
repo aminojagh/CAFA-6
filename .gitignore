@@ -14,3 +14,21 @@ cafa.md
 *.obo
 *.fasta
 *.gz
+
+# local build outputs
+/.pytest_cache
+/artifacts/*
+/results/*
+/recreated_comp_data/Train/*
+/recreated_comp_data/Test/*
+/recreated_comp_data/Pred/*
+
+# environments
+.venv/
+env/
+venv/
+
+# codex
+.codex
+PLANS.md
+AGENTS.md
