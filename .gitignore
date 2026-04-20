@@ -28,6 +28,9 @@ cafa.md
 env/
 venv/
 
+# IDE
+.vscode
+
 # codex
 .codex
 PLANS.md

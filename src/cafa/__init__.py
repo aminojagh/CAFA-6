@@ -1,6 +1,19 @@
 """Minimal public exports for the current `G1` implementation step."""
 
 from .config import ProjectConfig
+from .ontology import (
+    GOTerm,
+    GeneOntology,
+    ancestors_of,
+    canonicalize_go_id,
+    filter_terms_to_subontology,
+    parents_of,
+    propagate_scores,
+    propagate_terms,
+    read_go_obo,
+    subontology_terms,
+    terms_of_interest,
+)
 from .types import (
     AspectCode,
     BenchmarkBundle,
@@ -24,6 +37,8 @@ __all__ = [
     "BenchmarkBundle",
     "CurvePoint",
     "EvaluationResult",
+    "GOTerm",
+    "GeneOntology",
     "GoId",
     "ProjectConfig",
     "ProteinId",
@@ -36,4 +51,13 @@ __all__ = [
     "TaxonRecord",
     "ValidationMismatch",
     "ValidationReport",
+    "ancestors_of",
+    "canonicalize_go_id",
+    "filter_terms_to_subontology",
+    "parents_of",
+    "propagate_scores",
+    "propagate_terms",
+    "read_go_obo",
+    "subontology_terms",
+    "terms_of_interest",
 ]

@@ -11,10 +11,17 @@ Reproducible CAFA-style protein function prediction project, built independently
 
 ## Structure
 
-- `PLANS.md`: task DAG and technical specification
-- `AGENTS.md`: working rules and project preferences
-- `main.ipynb`: notebook-first orchestration surface
+- `src/cafa/`: project source code
+- `tests/`: automated tests for implemented modules
+- `main.ipynb`: the project run interface
 
 ## Status
 
-The repository currently keeps plans and task specifications only. Code will be implemented one task at a time, commit by commit.
+The project is being implemented incrementally, one coherent commit at a time.
+
+Current implemented scope:
+
+- shared domain types and `ProjectConfig`
+- GO ontology parsing and traversal
+- ontology tests
+- notebook cells that load and exercise the GO graph
