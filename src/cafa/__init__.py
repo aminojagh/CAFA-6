@@ -1,5 +1,3 @@
-"""Minimal public exports for the current `G1` implementation step."""
-
 from .config import ProjectConfig
 from .ontology import (
     GOTerm,
@@ -13,6 +11,13 @@ from .ontology import (
     read_go_obo,
     subontology_terms,
     terms_of_interest,
+)
+from .sources import (
+    ResearchRequiredError,
+    resolve_annotation_source_chain,
+    resolve_go_obo_snapshot,
+    resolve_uniprot_sprot_snapshot,
+    sha256_file,
 )
 from .types import (
     AspectCode,
@@ -41,6 +46,7 @@ __all__ = [
     "GeneOntology",
     "GoId",
     "ProjectConfig",
+    "ResearchRequiredError",
     "ProteinId",
     "ProteinTaxonRecord",
     "ProteinTermRecord",
@@ -58,6 +64,10 @@ __all__ = [
     "propagate_scores",
     "propagate_terms",
     "read_go_obo",
+    "resolve_annotation_source_chain",
+    "resolve_go_obo_snapshot",
+    "resolve_uniprot_sprot_snapshot",
+    "sha256_file",
     "subontology_terms",
     "terms_of_interest",
 ]
