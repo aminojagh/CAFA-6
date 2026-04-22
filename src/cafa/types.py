@@ -89,27 +89,15 @@ class SequenceRecord:
 
 
 @dataclass(frozen=True, slots=True)
-class ValidationMismatch:
-    """One concrete mismatch discovered by artifact validation."""
-
-    artifact_name: str
-    kind: str
-    message: str
-    sample_left_only: tuple[str, ...] = ()
-    sample_right_only: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True, slots=True)
 class ValidationReport:
-    """Canonical validation result for one recreated artifact."""
+    """Simplified canonical validation result for one artifact comparison."""
 
-    artifact_name: str
     left_path: Path
     right_path: Path
     passed: bool
-    mode: str
-    checked_properties: tuple[str, ...] = ()
-    mismatches: tuple[ValidationMismatch, ...] = ()
+    message: str = ""
+    sample_left_only: tuple[str, ...] = ()
+    sample_right_only: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

@@ -14,7 +14,7 @@ cafa.md
 *.obo
 *.fasta
 *.gz
-
+*.tsv
 # local build outputs
 /.pytest_cache
 /artifacts/*

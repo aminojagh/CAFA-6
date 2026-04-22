@@ -32,6 +32,14 @@ from .sources import (
     resolve_uniprot_sprot_snapshot,
     sha256_file,
 )
+from .validation import (
+    filter_reference_sequence_records,
+    filter_reference_train_taxonomy_rows,
+    filter_reference_train_term_rows,
+    validate_sequence_mapping,
+    validate_train_taxonomy,
+    validate_train_terms,
+)
 from .types import (
     AspectCode,
     BenchmarkBundle,
@@ -47,7 +55,6 @@ from .types import (
     Subontology,
     TaxonId,
     TaxonRecord,
-    ValidationMismatch,
     ValidationReport,
 )
 
@@ -70,13 +77,15 @@ __all__ = [
     "Subontology",
     "TaxonId",
     "TaxonRecord",
-    "ValidationMismatch",
     "ValidationReport",
     "ancestors_of",
     "benchmark_output_dir",
     "build_recreated_layout",
     "canonicalize_go_id",
     "filter_terms_to_subontology",
+    "filter_reference_sequence_records",
+    "filter_reference_train_taxonomy_rows",
+    "filter_reference_train_term_rows",
     "parents_of",
     "propagate_scores",
     "propagate_terms",
@@ -92,6 +101,9 @@ __all__ = [
     "sha256_file",
     "subontology_terms",
     "terms_of_interest",
+    "validate_sequence_mapping",
+    "validate_train_taxonomy",
+    "validate_train_terms",
     "write_sequences",
     "write_test_taxon_rows",
     "write_train_taxonomy",
