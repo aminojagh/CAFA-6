@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import csv
 from pathlib import Path
 
+from Bio import SeqIO
+
+from .ontology import GeneOntology, canonicalize_go_id
 from .types import (
+    GoId,
     ProteinTaxonRecord,
     ProteinTermRecord,
     RecreatedLayout,
@@ -110,6 +115,85 @@ def write_test_taxon_rows(
     return _write_text(output_path, header + body)
 
 
+def read_fasta_records(path: str | Path) -> tuple[SequenceRecord, ...]:
+    """Read FASTA records into canonical sequence containers."""
+
+    records: list[SequenceRecord] = []
+    with Path(path).open(encoding="utf-8") as handle:
+        for record in SeqIO.parse(handle, "fasta"):
+            header = f">{record.description}"
+            records.append(
+                SequenceRecord(
+                    protein_id=_protein_id_from_fasta_header(header),
+                    header=header,
+                    sequence=str(record.seq),
+                )
+            )
+    return tuple(records)
+
+
+def read_train_taxonomy_rows(path: str | Path) -> tuple[ProteinTaxonRecord, ...]:
+    """Read train taxonomy rows from a recreated or reference TSV artifact."""
+
+    rows: list[ProteinTaxonRecord] = []
+    for raw_row in _read_tsv_rows(path):
+        if raw_row[0] in {"EntryID", "ID"}:
+            continue
+        rows.append(ProteinTaxonRecord(protein_id=raw_row[0], taxon_id=int(raw_row[1])))
+    return tuple(rows)
+
+
+def read_train_term_rows(
+    path: str | Path,
+    ontology: GeneOntology | None = None,
+) -> tuple[ProteinTermRecord, ...]:
+    """Read train term rows from a recreated or reference TSV artifact."""
+
+    rows: list[ProteinTermRecord] = []
+    for raw_row in _read_tsv_rows(path):
+        if raw_row[0] in {"EntryID", "ID"}:
+            continue
+        term_id = raw_row[1]
+        if ontology is not None:
+            term_id = canonicalize_go_id(ontology, term_id)
+        rows.append(
+            ProteinTermRecord(
+                protein_id=raw_row[0],
+                term_id=term_id,
+                aspect=raw_row[2].strip().upper(),
+            )
+        )
+    return tuple(rows)
+
+
+def read_test_taxon_rows(path: str | Path) -> tuple[TaxonRecord, ...]:
+    """Read test taxon rows from a recreated or reference TSV artifact."""
+
+    rows: list[TaxonRecord] = []
+    for raw_row in _read_tsv_rows(path):
+        if raw_row[0] in {"taxon_id", "ID"}:
+            continue
+        rows.append(TaxonRecord(taxon_id=int(raw_row[0]), species_name=raw_row[1]))
+    return tuple(rows)
+
+
+def read_ia_values(
+    path: str | Path,
+    ontology: GeneOntology | None = None,
+) -> dict[GoId, float]:
+    """Read IA values from a two-column TSV artifact."""
+
+    values: dict[GoId, float] = {}
+    for raw_row in _read_tsv_rows(path):
+        if raw_row[0] in {"term", "go_id", "GO_ID"}:
+            continue
+        term_id = raw_row[0]
+        if ontology is not None:
+            term_id = canonicalize_go_id(ontology, term_id)
+        values[term_id] = float(raw_row[1])
+    return values
+
+
 def _write_text(output_path: str | Path, text: str) -> Path:
     path = Path(output_path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -127,3 +211,18 @@ def _wrap_sequence(sequence: str, width: int) -> list[str]:
     if not sequence:
         return [""]
     return [sequence[start : start + width] for start in range(0, len(sequence), width)]
+
+
+def _read_tsv_rows(path: str | Path) -> list[list[str]]:
+    with Path(path).open(encoding="utf-8", newline="") as handle:
+        return [row for row in csv.reader(handle, delimiter="\t") if row]
+
+
+def _protein_id_from_fasta_header(header: str) -> str:
+    bare_header = header[1:] if header.startswith(">") else header
+    token = bare_header.split(maxsplit=1)[0]
+    if token.startswith(("sp|", "tr|")):
+        parts = token.split("|")
+        if len(parts) >= 2 and parts[1]:
+            return parts[1]
+    return token

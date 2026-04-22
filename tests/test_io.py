@@ -7,12 +7,46 @@ import unittest
 from cafa.io import (
     benchmark_output_dir,
     build_recreated_layout,
+    read_fasta_records,
+    read_ia_values,
+    read_test_taxon_rows,
+    read_train_taxonomy_rows,
+    read_train_term_rows,
     write_sequences,
     write_test_taxon_rows,
     write_train_taxonomy,
     write_train_terms,
 )
+from cafa.ontology import read_go_obo
 from cafa.types import ProteinTaxonRecord, ProteinTermRecord, SequenceRecord, TaxonRecord
+
+TEST_OBO = """format-version: 1.2
+ontology: go
+name: mini-go
+data-version: releases/2025-06-01
+
+[Term]
+id: GO:0003674
+name: molecular_function
+namespace: molecular_function
+
+[Term]
+id: GO:0008150
+name: biological_process
+namespace: biological_process
+
+[Term]
+id: GO:0005575
+name: cellular_component
+namespace: cellular_component
+
+[Term]
+id: GO:0000002
+name: child term
+namespace: molecular_function
+alt_id: GO:0009002
+is_a: GO:0003674 ! molecular_function
+"""
 
 
 class RecreatedLayoutTests(unittest.TestCase):
@@ -119,6 +153,108 @@ class WriterTests(unittest.TestCase):
             self.assertEqual(
                 output_path.read_text(encoding="utf-8"),
                 "taxon_id\tspecies_name\n9606\tHomo sapiens\n10090\tMus musculus\n",
+            )
+
+
+class ReaderTests(unittest.TestCase):
+    def test_read_fasta_records_round_trips_writer_output(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "Train" / "train_sequences.fasta"
+            records = (
+                SequenceRecord(
+                    protein_id="P2",
+                    header="sp|P2|SECOND second protein",
+                    sequence="B" * 5,
+                ),
+                SequenceRecord(
+                    protein_id="P1",
+                    header=">sp|P1|FIRST first protein",
+                    sequence="A" * 65,
+                ),
+            )
+
+            write_sequences(records, output_path)
+            parsed = read_fasta_records(output_path)
+
+            self.assertEqual(
+                parsed,
+                (
+                    SequenceRecord(
+                        protein_id="P1",
+                        header=">sp|P1|FIRST first protein",
+                        sequence="A" * 65,
+                    ),
+                    SequenceRecord(
+                        protein_id="P2",
+                        header=">sp|P2|SECOND second protein",
+                        sequence="B" * 5,
+                    ),
+                ),
+            )
+
+    def test_read_train_taxonomy_rows_supports_reference_file_without_header(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "train_taxonomy.tsv"
+            path.write_text("A0A\t9606\nQ9Z\t10090\n", encoding="utf-8")
+
+            self.assertEqual(
+                read_train_taxonomy_rows(path),
+                (
+                    ProteinTaxonRecord(protein_id="A0A", taxon_id=9606),
+                    ProteinTaxonRecord(protein_id="Q9Z", taxon_id=10090),
+                ),
+            )
+
+    def test_read_train_term_rows_can_canonicalize_with_ontology(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            obo_path = Path(tmpdir) / "mini.obo"
+            obo_path.write_text(TEST_OBO, encoding="utf-8")
+            ontology = read_go_obo(obo_path)
+
+            path = Path(tmpdir) / "train_terms.tsv"
+            path.write_text(
+                "EntryID\tterm\taspect\nP1\tGO:0009002\tf\nP2\tGO:0008150\tP\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                read_train_term_rows(path, ontology=ontology),
+                (
+                    ProteinTermRecord(protein_id="P1", term_id="GO:0000002", aspect="F"),
+                    ProteinTermRecord(protein_id="P2", term_id="GO:0008150", aspect="P"),
+                ),
+            )
+
+    def test_read_test_taxon_rows_supports_reference_header_shape(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "testsuperset-taxon-list.tsv"
+            path.write_text(
+                "ID\tSpecies\n9606\tHomo sapiens\n10116\tRattus norvegicus\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                read_test_taxon_rows(path),
+                (
+                    TaxonRecord(taxon_id=9606, species_name="Homo sapiens"),
+                    TaxonRecord(taxon_id=10116, species_name="Rattus norvegicus"),
+                ),
+            )
+
+    def test_read_ia_values_reads_two_column_file(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "IA.tsv"
+            path.write_text(
+                "GO:0000001\t0.0\nGO:0000012\t6.038630248164372\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                read_ia_values(path),
+                {
+                    "GO:0000001": 0.0,
+                    "GO:0000012": 6.038630248164372,
+                },
             )
 
 
