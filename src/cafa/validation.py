@@ -8,10 +8,11 @@ from typing import AbstractSet
 from .config import ProjectConfig
 from .io import (
     read_fasta_records,
+    read_ia_values,
     read_train_taxonomy_rows,
     read_train_term_rows,
 )
-from .ontology import GeneOntology
+from .ontology import GeneOntology, read_go_obo
 from .types import (
     ProteinId,
     ProteinTaxonRecord,
@@ -55,6 +56,46 @@ def validate_train_taxonomy(
         left_mapping=recreated_mapping,
         right_mapping=reference_mapping,
         formatter=lambda protein_id, taxon_id: f"{protein_id}\t{taxon_id}",
+    )
+
+
+def validate_go_obo(
+    recreated_path: str | Path,
+    reference_path: str | Path,
+) -> ValidationReport:
+    """Validate GO release metadata, canonical term set, and parent edges."""
+
+    recreated_ontology = read_go_obo(recreated_path)
+    reference_ontology = read_go_obo(reference_path)
+
+    if recreated_ontology.release != reference_ontology.release:
+        return ValidationReport(
+            left_path=Path(recreated_path),
+            right_path=Path(reference_path),
+            passed=False,
+            message="GO release metadata mismatch.",
+            sample_left_only=((recreated_ontology.release or "None"),),
+            sample_right_only=((reference_ontology.release or "None"),),
+        )
+
+    recreated_terms = {
+        term_id: tuple(sorted(term.parent_ids))
+        for term_id, term in recreated_ontology.terms.items()
+    }
+    reference_terms = {
+        term_id: tuple(sorted(term.parent_ids))
+        for term_id, term in reference_ontology.terms.items()
+    }
+
+    return _mapping_comparison_report(
+        recreated_path=recreated_path,
+        reference_path=reference_path,
+        message="GO canonical term set or parent-edge structure mismatch.",
+        left_mapping=recreated_terms,
+        right_mapping=reference_terms,
+        formatter=lambda term_id, parent_ids: (
+            f"{term_id}\t{','.join(parent_ids)}" if parent_ids else term_id
+        ),
     )
 
 
@@ -121,6 +162,57 @@ def validate_sequence_mapping(
         left_mapping=recreated_mapping,
         right_mapping=reference_mapping,
         formatter=lambda protein_id, sequence: f"{protein_id}\t{sequence}",
+    )
+
+
+def validate_ia_values(
+    recreated_path: str | Path,
+    reference_path: str | Path,
+    ontology: GeneOntology | None = None,
+    relative_tolerance: float = 1e-9,
+    absolute_tolerance: float = 1e-12,
+) -> ValidationReport:
+    """Validate IA term coverage and numeric agreement within tolerance."""
+
+    recreated_values = read_ia_values(recreated_path, ontology=ontology)
+    reference_values = read_ia_values(reference_path, ontology=ontology)
+
+    left_only_keys = sorted(set(recreated_values) - set(reference_values))
+    right_only_keys = sorted(set(reference_values) - set(recreated_values))
+    shared_mismatch_keys = sorted(
+        term_id
+        for term_id in set(recreated_values) & set(reference_values)
+        if not _is_close(
+            recreated_values[term_id],
+            reference_values[term_id],
+            relative_tolerance=relative_tolerance,
+            absolute_tolerance=absolute_tolerance,
+        )
+    )
+
+    sample_left_only = tuple(
+        f"{term_id}\t{recreated_values[term_id]}"
+        for term_id in left_only_keys[:5]
+    ) + tuple(
+        f"{term_id}\t{recreated_values[term_id]}"
+        for term_id in shared_mismatch_keys[:5]
+    )
+    sample_right_only = tuple(
+        f"{term_id}\t{reference_values[term_id]}"
+        for term_id in right_only_keys[:5]
+    ) + tuple(
+        f"{term_id}\t{reference_values[term_id]}"
+        for term_id in shared_mismatch_keys[:5]
+    )
+
+    passed = not left_only_keys and not right_only_keys and not shared_mismatch_keys
+    return ValidationReport(
+        left_path=Path(recreated_path),
+        right_path=Path(reference_path),
+        passed=passed,
+        message="" if passed else "IA term coverage or numeric values mismatch.",
+        sample_left_only=sample_left_only,
+        sample_right_only=sample_right_only,
     )
 
 
@@ -219,3 +311,14 @@ def _group_terms_by_protein(
         )
         for protein_id, records in grouped.items()
     }
+
+
+def _is_close(
+    left: float,
+    right: float,
+    relative_tolerance: float,
+    absolute_tolerance: float,
+) -> bool:
+    difference = abs(left - right)
+    tolerance = max(absolute_tolerance, relative_tolerance * max(abs(left), abs(right)))
+    return difference <= tolerance

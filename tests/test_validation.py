@@ -12,6 +12,8 @@ from cafa.validation import (
     filter_reference_sequence_records,
     filter_reference_train_taxonomy_rows,
     filter_reference_train_term_rows,
+    validate_go_obo,
+    validate_ia_values,
     validate_sequence_mapping,
     validate_train_taxonomy,
     validate_train_terms,
@@ -104,6 +106,32 @@ class FilterTests(unittest.TestCase):
 
 
 class ValidationTests(unittest.TestCase):
+    def test_validate_go_obo_passes_for_structurally_equal_files(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            recreated_path = root / "recreated.obo"
+            reference_path = root / "reference.obo"
+            recreated_path.write_text(TEST_OBO, encoding="utf-8")
+            reference_path.write_text(TEST_OBO, encoding="utf-8")
+
+            report = validate_go_obo(recreated_path, reference_path)
+
+            self.assertTrue(report.passed)
+            self.assertEqual(report.message, "")
+
+    def test_validate_go_obo_reports_release_mismatch(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            recreated_path = root / "recreated.obo"
+            reference_path = root / "reference.obo"
+            recreated_path.write_text(TEST_OBO.replace("2025-06-01", "2025-06-02"), encoding="utf-8")
+            reference_path.write_text(TEST_OBO, encoding="utf-8")
+
+            report = validate_go_obo(recreated_path, reference_path)
+
+            self.assertFalse(report.passed)
+            self.assertIn("release", report.message.lower())
+
     def test_validate_train_taxonomy_passes_after_reference_filtering(self) -> None:
         with TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -165,6 +193,44 @@ class ValidationTests(unittest.TestCase):
             self.assertFalse(report.passed)
             self.assertIn("P1", report.sample_left_only[0])
             self.assertIn("mismatch", report.message.lower())
+
+    def test_validate_ia_values_passes_within_tolerance(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            recreated_path = root / "recreated_ia.tsv"
+            reference_path = root / "reference_ia.tsv"
+            recreated_path.write_text("GO:0000001\t1.0000000001\n", encoding="utf-8")
+            reference_path.write_text("GO:0000001\t1.0\n", encoding="utf-8")
+
+            report = validate_ia_values(
+                recreated_path,
+                reference_path,
+                relative_tolerance=1e-9,
+                absolute_tolerance=1e-9,
+            )
+
+            self.assertTrue(report.passed)
+            self.assertEqual(report.message, "")
+
+    def test_validate_ia_values_reports_term_or_value_mismatch(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            recreated_path = root / "recreated_ia.tsv"
+            reference_path = root / "reference_ia.tsv"
+            recreated_path.write_text("GO:0000001\t1.5\n", encoding="utf-8")
+            reference_path.write_text("GO:0000001\t1.0\nGO:0000002\t2.0\n", encoding="utf-8")
+
+            report = validate_ia_values(
+                recreated_path,
+                reference_path,
+                relative_tolerance=1e-12,
+                absolute_tolerance=1e-12,
+            )
+
+            self.assertFalse(report.passed)
+            self.assertIn("mismatch", report.message.lower())
+            self.assertTrue(report.sample_left_only)
+            self.assertTrue(report.sample_right_only)
 
 
 if __name__ == "__main__":
