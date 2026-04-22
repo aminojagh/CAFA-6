@@ -113,6 +113,34 @@ class ValidationReport:
 
 
 @dataclass(frozen=True, slots=True)
+class RecreatedLayout:
+    """Canonical output layout for recreated CAFA-style artifacts.
+
+    Attributes
+    ----------
+    root_dir:
+        Root directory that contains all recreated artifacts.
+    train_dir:
+        Directory for recreated training artifacts.
+    test_dir:
+        Directory for recreated test-superset artifacts.
+    pred_dir:
+        Directory reserved for prediction-like artifacts.
+    benchmark_dir:
+        Directory reserved for ontology-specific benchmark outputs.
+    ia_path:
+        Canonical path for the recreated `IA.tsv` artifact.
+    """
+
+    root_dir: Path
+    train_dir: Path
+    test_dir: Path
+    pred_dir: Path
+    benchmark_dir: Path
+    ia_path: Path
+
+
+@dataclass(frozen=True, slots=True)
 class BenchmarkBundle:
     """Ontology-specific benchmark artifacts grouped in memory.
 

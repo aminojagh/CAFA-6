@@ -1,4 +1,12 @@
 from .config import ProjectConfig
+from .io import (
+    benchmark_output_dir,
+    build_recreated_layout,
+    write_sequences,
+    write_test_taxon_rows,
+    write_train_taxonomy,
+    write_train_terms,
+)
 from .ontology import (
     GOTerm,
     GeneOntology,
@@ -28,6 +36,7 @@ from .types import (
     ProteinId,
     ProteinTaxonRecord,
     ProteinTermRecord,
+    RecreatedLayout,
     SequenceRecord,
     SourceSnapshot,
     Subontology,
@@ -46,6 +55,7 @@ __all__ = [
     "GeneOntology",
     "GoId",
     "ProjectConfig",
+    "RecreatedLayout",
     "ResearchRequiredError",
     "ProteinId",
     "ProteinTaxonRecord",
@@ -58,6 +68,8 @@ __all__ = [
     "ValidationMismatch",
     "ValidationReport",
     "ancestors_of",
+    "benchmark_output_dir",
+    "build_recreated_layout",
     "canonicalize_go_id",
     "filter_terms_to_subontology",
     "parents_of",
@@ -70,4 +82,8 @@ __all__ = [
     "sha256_file",
     "subontology_terms",
     "terms_of_interest",
+    "write_sequences",
+    "write_test_taxon_rows",
+    "write_train_taxonomy",
+    "write_train_terms",
 ]
