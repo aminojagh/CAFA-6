@@ -27,6 +27,8 @@ from .ontology import (
 )
 from .sources import (
     ResearchRequiredError,
+    download_and_validate_go_obo,
+    download_source,
     resolve_annotation_source_chain,
     resolve_go_obo_snapshot,
     resolve_uniprot_sprot_snapshot,
@@ -71,6 +73,8 @@ __all__ = [
     "ProjectConfig",
     "RecreatedLayout",
     "ResearchRequiredError",
+    "download_and_validate_go_obo",
+    "download_source",
     "ProteinId",
     "ProteinTaxonRecord",
     "ProteinTermRecord",

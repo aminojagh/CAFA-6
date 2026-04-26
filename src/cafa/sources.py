@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from hashlib import sha256
 from pathlib import Path
+from urllib.request import urlopen
 
 from .config import ProjectConfig
 from .types import SourceSnapshot
+from .validation import validate_go_obo
 
 
 class ResearchRequiredError(RuntimeError):
@@ -57,8 +59,9 @@ def resolve_uniprot_sprot_snapshot(config: ProjectConfig) -> SourceSnapshot:
     Returns
     -------
     SourceSnapshot
-        Metadata for the archive that contains the release-specific Swiss-Prot
-        FASTA payload used by later train and test extraction work.
+        Metadata for the release-specific Swiss-Prot archive that contains the
+        flatfile, FASTA, isoform FASTA, and XML payloads used by later train
+        and test extraction work.
     """
 
     release = config.train_uniprot_release
@@ -90,6 +93,41 @@ def resolve_annotation_source_chain(config: ProjectConfig) -> tuple[SourceSnapsh
         "Annotation source-chain resolution is still blocked by research gates "
         "in PLANS.md (benchmark evidence policy and IA source chain)."
     )
+
+
+def download_source(snapshot: SourceSnapshot, chunk_size: int = 1024 * 1024) -> Path:
+    """Download a source snapshot to its resolved local path.
+
+    Existing files are reused as-is to keep notebook runs deterministic and to
+    avoid unnecessary network traffic.
+    """
+
+    if snapshot.local_path.exists():
+        return snapshot.local_path
+
+    snapshot.local_path.parent.mkdir(parents=True, exist_ok=True)
+    with urlopen(snapshot.url) as response, snapshot.local_path.open("wb") as handle:
+        while True:
+            chunk = response.read(chunk_size)
+            if not chunk:
+                break
+            handle.write(chunk)
+    return snapshot.local_path
+
+
+def download_and_validate_go_obo(
+    config: ProjectConfig,
+    reference_path: str | Path,
+) -> Path:
+    """Download the pinned GO OBO file and validate it against the reference."""
+
+    snapshot = resolve_go_obo_snapshot(config)
+    downloaded_path = download_source(snapshot)
+    report = validate_go_obo(downloaded_path, reference_path)
+    if not report.passed:
+        message = report.message or "Downloaded GO ontology validation failed."
+        raise RuntimeError(message)
+    return downloaded_path
 
 
 def sha256_file(path: Path) -> str:

@@ -5,15 +5,30 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import hashlib
 import unittest
+from unittest.mock import patch
 
 from cafa.config import ProjectConfig
 from cafa.sources import (
     ResearchRequiredError,
+    download_and_validate_go_obo,
+    download_source,
     resolve_annotation_source_chain,
     resolve_go_obo_snapshot,
     resolve_uniprot_sprot_snapshot,
     sha256_file,
 )
+from cafa.types import SourceSnapshot
+
+TEST_OBO = """format-version: 1.2
+ontology: go
+name: mini-go
+data-version: releases/2025-06-01
+
+[Term]
+id: GO:0003674
+name: molecular_function
+namespace: molecular_function
+"""
 
 
 def build_config(project_root: Path) -> ProjectConfig:
@@ -70,6 +85,48 @@ class SourceResolutionTests(unittest.TestCase):
             payload = b"cafa-source-resolution\n"
             path.write_bytes(payload)
             self.assertEqual(sha256_file(path), hashlib.sha256(payload).hexdigest())
+
+    def test_download_source_downloads_file_url(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            source_path = root / "source.txt"
+            source_path.write_text("hello go\n", encoding="utf-8")
+            target_path = root / "cache" / "downloaded.txt"
+            snapshot = SourceSnapshot(
+                name="sample",
+                url=source_path.resolve().as_uri(),
+                local_path=target_path,
+                description="sample file",
+            )
+
+            downloaded_path = download_source(snapshot, chunk_size=4)
+
+            self.assertEqual(downloaded_path, target_path)
+            self.assertEqual(target_path.read_text(encoding="utf-8"), "hello go\n")
+
+    def test_download_and_validate_go_obo_uses_downloaded_snapshot(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            source_path = root / "source_go.obo"
+            source_path.write_text(TEST_OBO, encoding="utf-8")
+            reference_path = root / "reference_go.obo"
+            reference_path.write_text(TEST_OBO, encoding="utf-8")
+            target_path = root / "cache" / "go-basic.obo"
+            snapshot = SourceSnapshot(
+                name="go-basic.obo",
+                url=source_path.resolve().as_uri(),
+                local_path=target_path,
+                description="test go file",
+            )
+
+            with patch("cafa.sources.resolve_go_obo_snapshot", return_value=snapshot):
+                downloaded_path = download_and_validate_go_obo(
+                    build_config(root),
+                    reference_path,
+                )
+
+            self.assertEqual(downloaded_path, target_path)
+            self.assertEqual(target_path.read_text(encoding="utf-8"), TEST_OBO)
 
     def test_resolve_annotation_source_chain_raises(self) -> None:
         config = build_config(Path("/tmp/project"))
