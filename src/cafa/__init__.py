@@ -34,6 +34,7 @@ from .sources import (
     resolve_uniprot_sprot_snapshot,
     sha256_file,
 )
+from .train import extract_train_taxonomy_records
 from .validation import (
     filter_reference_sequence_records,
     filter_reference_train_taxonomy_rows,
@@ -75,6 +76,7 @@ __all__ = [
     "ResearchRequiredError",
     "download_and_validate_go_obo",
     "download_source",
+    "extract_train_taxonomy_records",
     "ProteinId",
     "ProteinTaxonRecord",
     "ProteinTermRecord",

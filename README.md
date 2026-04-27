@@ -18,6 +18,7 @@ The repository currently includes the core foundations for the larger pipeline:
 
 - shared data and configuration types
 - source snapshot resolution utilities
+- Swiss-Prot train taxonomy extraction from the pinned 2025_03 release archive
 - Gene Ontology parsing, canonicalization, traversal, and propagation helpers
 - deterministic readers and writers for core artifact formats
 - validation utilities and automated unit tests
@@ -51,7 +52,7 @@ export PYTHONPATH=src
 
 ## Development Workflow
 
-The codebase is being built incrementally, with the current implementation concentrated on data modeling, ontology utilities, artifact I/O, and validation. The broader pipeline layers for data extraction, benchmark assembly, training, evaluation, and inference will build on top of these foundations.
+The codebase is being built incrementally, with the current implementation concentrated on data modeling, source handling, ontology utilities, artifact I/O, validation, and the first train extraction slice. The broader pipeline layers for train terms, train sequences, test extraction, benchmark assembly, training, evaluation, and inference will build on top of this base.
 
 ## Testing
 
