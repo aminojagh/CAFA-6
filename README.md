@@ -22,6 +22,7 @@ The repository currently includes the core foundations for the larger pipeline:
 - Gene Ontology parsing, canonicalization, traversal, and propagation helpers
 - deterministic readers and writers for core artifact formats
 - validation utilities and automated unit tests
+- a practical `main.ipynb` pipeline for the currently implemented stages
 
 ## Repository Layout
 
@@ -52,7 +53,7 @@ export PYTHONPATH=src
 
 ## Development Workflow
 
-The codebase is being built incrementally, with the current implementation concentrated on data modeling, source handling, ontology utilities, artifact I/O, validation, and the first train extraction slice. The broader pipeline layers for train terms, train sequences, test extraction, benchmark assembly, training, evaluation, and inference will build on top of this base.
+The codebase is being built incrementally. `main.ipynb` is the operational notebook for the stages implemented so far: it uses pinned real sources, recreates actual artifacts under `recreated_comp_data/`, and validates them against the reference data. The broader pipeline layers for train terms, train sequences, test extraction, benchmark assembly, training, evaluation, and inference will be added to that same flow as they are implemented.
 
 ## Testing
 
