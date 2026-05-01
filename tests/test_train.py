@@ -27,6 +27,13 @@ DR   GO; GO:0003674; F:mock function; EXP:UniProtKB-KW.
 SQ   SEQUENCE   5 AA;  555 MW;  ABCDEF CRC64;
      MAAAA
 //
+ID   HUMAN_THREE             Reviewed;         5 AA.
+AC   P54321;
+OX   NCBI_TaxID=9606;
+DR   GO; GO:0008150; P:mock process; IEA:UniProtKB-KW.
+SQ   SEQUENCE   5 AA;  555 MW;  ABCDEF CRC64;
+     MCCCC
+//
 ID   MOUSE_ONE               Reviewed;         5 AA.
 AC   P67890;
 OX   NCBI_TaxID=10090;
@@ -89,6 +96,7 @@ class TrainTaxonomyExtractionTests(unittest.TestCase):
                     # The primary accession is used even when secondary accessions exist.
                     # Output order is deterministic by protein ID.
                     ProteinTaxonRecord(protein_id="P12345", taxon_id=9606),
+                    ProteinTaxonRecord(protein_id="P54321", taxon_id=9606),
                     ProteinTaxonRecord(protein_id="Q99999", taxon_id=9606),
                 ),
             )
@@ -153,6 +161,9 @@ class TrainTaxonomyExtractionTests(unittest.TestCase):
 
             self.assertTrue(report.passed)
             self.assertEqual(report.message, "")
+            self.assertEqual(report.left_only_count, 1)
+            self.assertEqual(report.right_only_count, 0)
+            self.assertEqual(report.shared_mismatch_count, 0)
 
 
 if __name__ == "__main__":

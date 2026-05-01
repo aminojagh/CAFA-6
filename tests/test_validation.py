@@ -118,6 +118,9 @@ class ValidationTests(unittest.TestCase):
 
             self.assertTrue(report.passed)
             self.assertEqual(report.message, "")
+            self.assertEqual(report.left_only_count, 0)
+            self.assertEqual(report.right_only_count, 0)
+            self.assertEqual(report.shared_mismatch_count, 0)
 
     def test_validate_go_obo_reports_release_mismatch(self) -> None:
         with TemporaryDirectory() as tmpdir:
@@ -131,6 +134,9 @@ class ValidationTests(unittest.TestCase):
 
             self.assertFalse(report.passed)
             self.assertIn("release", report.message.lower())
+            self.assertEqual(report.left_only_count, 1)
+            self.assertEqual(report.right_only_count, 1)
+            self.assertEqual(report.shared_mismatch_count, 0)
 
     def test_validate_train_taxonomy_passes_after_reference_filtering(self) -> None:
         with TemporaryDirectory() as tmpdir:
@@ -144,6 +150,29 @@ class ValidationTests(unittest.TestCase):
 
             self.assertTrue(report.passed)
             self.assertEqual(report.message, "")
+            self.assertEqual(report.left_only_count, 0)
+            self.assertEqual(report.right_only_count, 0)
+            self.assertEqual(report.shared_mismatch_count, 0)
+
+    def test_validate_train_taxonomy_allows_left_only_superset_rows(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            recreated_path = root / "recreated_train_taxonomy.tsv"
+            reference_path = root / "reference_train_taxonomy.tsv"
+            recreated_path.write_text(
+                "EntryID\ttaxon_id\nP1\t9606\nP3\t9606\n",
+                encoding="utf-8",
+            )
+            reference_path.write_text("P1\t9606\n", encoding="utf-8")
+
+            report = validate_train_taxonomy(recreated_path, reference_path, build_config(root))
+
+            self.assertTrue(report.passed)
+            self.assertEqual(report.message, "")
+            self.assertEqual(report.left_only_count, 1)
+            self.assertEqual(report.right_only_count, 0)
+            self.assertEqual(report.shared_mismatch_count, 0)
+            self.assertIn("P3", report.sample_left_only[0])
 
     def test_validate_train_terms_passes_after_reference_filtering(self) -> None:
         with TemporaryDirectory() as tmpdir:
@@ -175,6 +204,9 @@ class ValidationTests(unittest.TestCase):
 
             self.assertTrue(report.passed)
             self.assertEqual(report.message, "")
+            self.assertEqual(report.left_only_count, 0)
+            self.assertEqual(report.right_only_count, 0)
+            self.assertEqual(report.shared_mismatch_count, 0)
 
     def test_validate_sequence_mapping_reports_mismatch(self) -> None:
         with TemporaryDirectory() as tmpdir:
@@ -193,6 +225,9 @@ class ValidationTests(unittest.TestCase):
             self.assertFalse(report.passed)
             self.assertIn("P1", report.sample_left_only[0])
             self.assertIn("mismatch", report.message.lower())
+            self.assertEqual(report.left_only_count, 0)
+            self.assertEqual(report.right_only_count, 0)
+            self.assertEqual(report.shared_mismatch_count, 1)
 
     def test_validate_ia_values_passes_within_tolerance(self) -> None:
         with TemporaryDirectory() as tmpdir:
@@ -211,6 +246,9 @@ class ValidationTests(unittest.TestCase):
 
             self.assertTrue(report.passed)
             self.assertEqual(report.message, "")
+            self.assertEqual(report.left_only_count, 0)
+            self.assertEqual(report.right_only_count, 0)
+            self.assertEqual(report.shared_mismatch_count, 0)
 
     def test_validate_ia_values_reports_term_or_value_mismatch(self) -> None:
         with TemporaryDirectory() as tmpdir:
@@ -231,6 +269,9 @@ class ValidationTests(unittest.TestCase):
             self.assertIn("mismatch", report.message.lower())
             self.assertTrue(report.sample_left_only)
             self.assertTrue(report.sample_right_only)
+            self.assertEqual(report.left_only_count, 0)
+            self.assertEqual(report.right_only_count, 1)
+            self.assertEqual(report.shared_mismatch_count, 1)
 
 
 if __name__ == "__main__":

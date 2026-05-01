@@ -90,12 +90,20 @@ class SequenceRecord:
 
 @dataclass(frozen=True, slots=True)
 class ValidationReport:
-    """Simplified canonical validation result for one artifact comparison."""
+    """Simplified canonical validation result for one artifact comparison.
+
+    `left_only_count` and `right_only_count` count keys present only on one
+    side of the comparison. `shared_mismatch_count` counts keys present on both
+    sides whose mapped values differ.
+    """
 
     left_path: Path
     right_path: Path
     passed: bool
     message: str = ""
+    left_only_count: int = 0
+    right_only_count: int = 0
+    shared_mismatch_count: int = 0
     sample_left_only: tuple[str, ...] = ()
     sample_right_only: tuple[str, ...] = ()
 

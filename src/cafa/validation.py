@@ -35,7 +35,20 @@ def validate_train_taxonomy(
     reference_path: str | Path,
     config: ProjectConfig,
 ) -> ValidationReport:
-    """Validate recreated train taxonomy rows against the filtered reference."""
+    """Validate recreated train taxonomy rows against the filtered reference.
+
+    Train-taxonomy validation is intentionally asymmetric. At this stage the
+    recreated taxonomy artifact is treated as a candidate superset gate for the
+    later protein-to-term extraction step, so extra recreated proteins are
+    tolerated. The validation is therefore considered passed when:
+
+    - every filtered reference protein is present in the recreated mapping, and
+    - every shared protein has the same taxon assignment.
+
+    In report terms, that means `right_only_count == 0` and
+    `shared_mismatch_count == 0`. Any remaining `left_only_count` is reported as
+    diagnostic information but does not fail this stage.
+    """
 
     recreated_rows = filter_reference_train_taxonomy_rows(
         read_train_taxonomy_rows(recreated_path),
@@ -49,13 +62,25 @@ def validate_train_taxonomy(
     recreated_mapping = {row.protein_id: row.taxon_id for row in recreated_rows}
     reference_mapping = {row.protein_id: row.taxon_id for row in reference_rows}
 
-    return _mapping_comparison_report(
+    report = _mapping_comparison_report(
         recreated_path=recreated_path,
         reference_path=reference_path,
         message="Protein-to-taxon membership mismatch.",
         left_mapping=recreated_mapping,
         right_mapping=reference_mapping,
         formatter=lambda protein_id, taxon_id: f"{protein_id}\t{taxon_id}",
+    )
+    taxonomy_passed = report.right_only_count == 0 and report.shared_mismatch_count == 0
+    return ValidationReport(
+        left_path=report.left_path,
+        right_path=report.right_path,
+        passed=taxonomy_passed,
+        message="" if taxonomy_passed else report.message,
+        left_only_count=report.left_only_count,
+        right_only_count=report.right_only_count,
+        shared_mismatch_count=report.shared_mismatch_count,
+        sample_left_only=report.sample_left_only,
+        sample_right_only=report.sample_right_only,
     )
 
 
@@ -74,6 +99,8 @@ def validate_go_obo(
             right_path=Path(reference_path),
             passed=False,
             message="GO release metadata mismatch.",
+            left_only_count=1,
+            right_only_count=1,
             sample_left_only=((recreated_ontology.release or "None"),),
             sample_right_only=((reference_ontology.release or "None"),),
         )
@@ -211,6 +238,9 @@ def validate_ia_values(
         right_path=Path(reference_path),
         passed=passed,
         message="" if passed else "IA term coverage or numeric values mismatch.",
+        left_only_count=len(left_only_keys),
+        right_only_count=len(right_only_keys),
+        shared_mismatch_count=len(shared_mismatch_keys),
         sample_left_only=sample_left_only,
         sample_right_only=sample_right_only,
     )
@@ -294,6 +324,9 @@ def _mapping_comparison_report(
         right_path=Path(reference_path),
         passed=passed,
         message="" if passed else message,
+        left_only_count=len(left_only_keys),
+        right_only_count=len(right_only_keys),
+        shared_mismatch_count=len(shared_mismatch_keys),
         sample_left_only=sample_left_only,
         sample_right_only=sample_right_only,
     )
