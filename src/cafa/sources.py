@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import shutil
+import tarfile
 from hashlib import sha256
 from pathlib import Path
 from urllib.request import urlopen
@@ -115,6 +117,57 @@ def download_source(snapshot: SourceSnapshot, chunk_size: int = 1024 * 1024) -> 
     return snapshot.local_path
 
 
+def extract_tar_gz_member(
+    archive_path: str | Path,
+    member_name: str,
+    output_path: str | Path | None = None,
+) -> Path:
+    """Extract and cache one member from a `.tar.gz` archive.
+
+    Parameters
+    ----------
+    archive_path:
+        Local path to an existing `.tar.gz` archive.
+    member_name:
+        Archive member to extract.
+    output_path:
+        Optional explicit extraction target. When omitted, the extracted member
+        is cached alongside the archive under a sibling directory whose name is
+        derived from the archive stem.
+
+    Returns
+    -------
+    Path
+        Local path to the extracted member. Existing extracted files are reused
+        as-is so only the raw unpacking work is cached.
+    """
+
+    archive_path = Path(archive_path)
+    extracted_path = Path(output_path) if output_path is not None else _default_extracted_member_path(
+        archive_path,
+        member_name,
+    )
+    if extracted_path.exists():
+        return extracted_path
+
+    extracted_path.parent.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(archive_path, "r:gz") as archive:
+        try:
+            member = archive.getmember(member_name)
+        except KeyError as exc:
+            raise FileNotFoundError(
+                f"Archive {archive_path} does not contain {member_name}."
+            ) from exc
+
+        member_handle = archive.extractfile(member)
+        if member_handle is None:
+            raise FileNotFoundError(f"Unable to read {member_name} from {archive_path}.")
+
+        with extracted_path.open("wb") as output_handle:
+            shutil.copyfileobj(member_handle, output_handle)
+    return extracted_path
+
+
 def download_and_validate_go_obo(
     config: ProjectConfig,
     reference_path: str | Path,
@@ -149,3 +202,10 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(8192), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _default_extracted_member_path(archive_path: Path, member_name: str) -> Path:
+    archive_stem = archive_path.name
+    if archive_stem.endswith(".tar.gz"):
+        archive_stem = archive_stem[: -len(".tar.gz")]
+    return archive_path.parent / archive_stem / member_name

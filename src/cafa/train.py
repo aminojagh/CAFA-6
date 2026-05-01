@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import gzip
-import tarfile
 from collections.abc import Iterator
 from pathlib import Path
 
 from Bio import SwissProt
 
 from .config import ProjectConfig
-from .sources import download_source
+from .sources import download_source, extract_tar_gz_member
 from .types import ProteinTaxonRecord, SourceSnapshot
 
 _SWISSPROT_FLATFILE_MEMBER = "uniprot_sprot.dat.gz"
@@ -42,6 +41,9 @@ def extract_train_taxonomy_records(
     - This function intentionally reads the annotation-bearing Swiss-Prot
       flatfile, not FASTA, because the same source remains authoritative for
       later train terms and train sequences.
+    - The raw `uniprot_sprot.dat.gz` member is extracted once under the cache
+      tree and then reused on later runs. This speeds up notebook reruns
+      without caching any logic-bearing transformation output.
     """
 
     allowed_taxon_ids = set(config.train_taxon_ids)
@@ -49,8 +51,9 @@ def extract_train_taxonomy_records(
         return ()
 
     archive_path = download_source(swissprot_snapshot)
+    flatfile_gz_path = extract_tar_gz_member(archive_path, _SWISSPROT_FLATFILE_MEMBER)
     protein_to_taxon: dict[str, int] = {}
-    for protein_id, taxon_id in _iter_primary_accession_and_taxon_pairs(archive_path):
+    for protein_id, taxon_id in _iter_primary_accession_and_taxon_pairs(flatfile_gz_path):
         if taxon_id not in allowed_taxon_ids:
             continue
         existing_taxon_id = protein_to_taxon.get(protein_id)
@@ -68,26 +71,13 @@ def extract_train_taxonomy_records(
 
 
 def _iter_primary_accession_and_taxon_pairs(
-    archive_path: str | Path,
-    member_name: str = _SWISSPROT_FLATFILE_MEMBER,
+    flatfile_gz_path: str | Path,
 ) -> Iterator[tuple[str, int]]:
-    """Yield `(primary_accession, primary_taxon_id)` from a Swiss-Prot archive."""
+    """Yield `(primary_accession, primary_taxon_id)` from an extracted Swiss-Prot flatfile."""
 
-    with tarfile.open(archive_path, "r:gz") as archive:
-        try:
-            member = archive.getmember(member_name)
-        except KeyError as exc:
-            raise FileNotFoundError(
-                f"Swiss-Prot archive does not contain {member_name}."
-            ) from exc
-
-        compressed_handle = archive.extractfile(member)
-        if compressed_handle is None:
-            raise FileNotFoundError(f"Unable to read {member_name} from Swiss-Prot archive.")
-
-        with gzip.open(compressed_handle, mode="rt", encoding="utf-8") as flatfile_handle:
-            for record in SwissProt.parse(flatfile_handle):
-                yield _primary_accession(record), _primary_taxon_id(record)
+    with gzip.open(flatfile_gz_path, mode="rt", encoding="utf-8") as flatfile_handle:
+        for record in SwissProt.parse(flatfile_handle):
+            yield _primary_accession(record), _primary_taxon_id(record)
 
 
 def _primary_accession(record: SwissProt.Record) -> str:

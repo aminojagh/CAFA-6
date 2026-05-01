@@ -4,6 +4,8 @@ from datetime import date
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import hashlib
+import io
+import tarfile
 import unittest
 from unittest.mock import patch
 
@@ -12,6 +14,7 @@ from cafa.sources import (
     ResearchRequiredError,
     download_and_validate_go_obo,
     download_source,
+    extract_tar_gz_member,
     resolve_annotation_source_chain,
     resolve_go_obo_snapshot,
     resolve_uniprot_sprot_snapshot,
@@ -128,10 +131,48 @@ class SourceResolutionTests(unittest.TestCase):
             self.assertEqual(downloaded_path, target_path)
             self.assertEqual(target_path.read_text(encoding="utf-8"), TEST_OBO)
 
+    def test_extract_tar_gz_member_extracts_and_reuses_cached_member(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            archive_path = root / "bundle.tar.gz"
+            self._write_tar_gz(
+                archive_path,
+                {"one.txt": b"first\n", "two.txt": b"second\n"},
+            )
+
+            extracted_path = extract_tar_gz_member(archive_path, "two.txt")
+            self.assertEqual(
+                extracted_path,
+                root / "bundle" / "two.txt",
+            )
+            self.assertEqual(extracted_path.read_text(encoding="utf-8"), "second\n")
+
+            extracted_path.write_text("modified\n", encoding="utf-8")
+            reused_path = extract_tar_gz_member(archive_path, "two.txt")
+            self.assertEqual(reused_path, extracted_path)
+            self.assertEqual(reused_path.read_text(encoding="utf-8"), "modified\n")
+
+    def test_extract_tar_gz_member_raises_for_missing_member(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            archive_path = root / "bundle.tar.gz"
+            self._write_tar_gz(archive_path, {"one.txt": b"first\n"})
+
+            with self.assertRaises(FileNotFoundError):
+                extract_tar_gz_member(archive_path, "missing.txt")
+
     def test_resolve_annotation_source_chain_raises(self) -> None:
         config = build_config(Path("/tmp/project"))
         with self.assertRaises(ResearchRequiredError):
             resolve_annotation_source_chain(config)
+
+    @staticmethod
+    def _write_tar_gz(path: Path, files: dict[str, bytes]) -> None:
+        with tarfile.open(path, "w:gz") as archive:
+            for name, payload in files.items():
+                info = tarfile.TarInfo(name)
+                info.size = len(payload)
+                archive.addfile(info, io.BytesIO(payload))
 
 
 if __name__ == "__main__":
