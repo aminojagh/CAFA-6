@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-from collections import defaultdict
 from collections.abc import Iterable
+from collections.abc import Callable
 from typing import AbstractSet
 
 from .config import ProjectConfig
@@ -68,22 +68,13 @@ def validate_train_taxonomy(
         message="Protein-to-taxon membership mismatch.",
         left_mapping=recreated_mapping,
         right_mapping=reference_mapping,
+        comparison_unit="protein_id",
         formatter=lambda protein_id, taxon_id: f"{protein_id}\t{taxon_id}",
+        pass_rule=lambda left_only, right_only, shared_mismatch: (
+            not right_only and not shared_mismatch
+        ),
     )
-    # TODO: this has to be handled inside a single logic.
-    # maybe we can specify the validation rule as an argument passed to `_mapping_comparison_report`
-    taxonomy_passed = report.right_only_count == 0 and report.shared_mismatch_count == 0
-    return ValidationReport(
-        left_path=report.left_path,
-        right_path=report.right_path,
-        passed=taxonomy_passed,
-        message="" if taxonomy_passed else report.message,
-        left_only_count=report.left_only_count,
-        right_only_count=report.right_only_count,
-        shared_mismatch_count=report.shared_mismatch_count,
-        sample_left_only=report.sample_left_only,
-        sample_right_only=report.sample_right_only,
-    )
+    return report
 
 
 def validate_go_obo(
@@ -101,6 +92,7 @@ def validate_go_obo(
             right_path=Path(reference_path),
             passed=False,
             message="GO release metadata mismatch.",
+            comparison_unit="go_release",
             left_only_count=1,
             right_only_count=1,
             sample_left_only=((recreated_ontology.release or "None"),),
@@ -122,6 +114,7 @@ def validate_go_obo(
         message="GO canonical term set or parent-edge structure mismatch.",
         left_mapping=recreated_terms,
         right_mapping=reference_terms,
+        comparison_unit="go_id",
         formatter=lambda term_id, parent_ids: (
             f"{term_id}\t{','.join(parent_ids)}" if parent_ids else term_id
         ),
@@ -155,18 +148,18 @@ def validate_train_terms(
         allowed_subontologies=set(config.subontologies),
     )
 
-    recreated_mapping = _group_terms_by_protein(recreated_rows)
-    reference_mapping = _group_terms_by_protein(filtered_reference_rows)
+    recreated_mapping = _map_term_pairs_to_aspect(recreated_rows)
+    reference_mapping = _map_term_pairs_to_aspect(filtered_reference_rows)
 
     return _mapping_comparison_report(
         recreated_path=recreated_path,
         reference_path=reference_path,
-        message="Protein-to-direct-GO-term mapping mismatch.",
+        message="Protein-to-direct-GO-term pair mapping mismatch.",
         left_mapping=recreated_mapping,
         right_mapping=reference_mapping,
-        formatter=lambda protein_id, term_records: (
-            f"{protein_id}\t"
-            + ",".join(f"{record.term_id}:{record.aspect}" for record in term_records)
+        comparison_unit="protein_go_pair",
+        formatter=lambda key, aspect: (
+            f"{key[0]}\t{key[1]}\t{aspect}"
         ),
     )
 
@@ -190,6 +183,7 @@ def validate_sequence_mapping(
         message=f"{artifact_name} protein-to-sequence mapping mismatch.",
         left_mapping=recreated_mapping,
         right_mapping=reference_mapping,
+        comparison_unit="protein_id",
         formatter=lambda protein_id, sequence: f"{protein_id}\t{sequence}",
     )
 
@@ -240,11 +234,20 @@ def validate_ia_values(
         right_path=Path(reference_path),
         passed=passed,
         message="" if passed else "IA term coverage or numeric values mismatch.",
+        comparison_unit="go_id",
         left_only_count=len(left_only_keys),
         right_only_count=len(right_only_keys),
         shared_mismatch_count=len(shared_mismatch_keys),
         sample_left_only=sample_left_only,
         sample_right_only=sample_right_only,
+        sample_shared_mismatch_left=tuple(
+            f"{term_id}\t{recreated_values[term_id]}"
+            for term_id in shared_mismatch_keys[:5]
+        ),
+        sample_shared_mismatch_right=tuple(
+            f"{term_id}\t{reference_values[term_id]}"
+            for term_id in shared_mismatch_keys[:5]
+        ),
     )
 
 
@@ -293,9 +296,11 @@ def _mapping_comparison_report(
     recreated_path: str | Path,
     reference_path: str | Path,
     message: str,
-    left_mapping: dict[ProteinId, object],
-    right_mapping: dict[ProteinId, object],
+    left_mapping: dict[object, object],
+    right_mapping: dict[object, object],
+    comparison_unit: str,
     formatter,
+    pass_rule: Callable[[list[object], list[object], list[object]], bool] | None = None,
 ) -> ValidationReport:
     left_only_keys = sorted(set(left_mapping) - set(right_mapping))
     right_only_keys = sorted(set(right_mapping) - set(left_mapping))
@@ -306,46 +311,57 @@ def _mapping_comparison_report(
     )
 
     sample_left_only = tuple(
-        formatter(protein_id, left_mapping[protein_id])
-        for protein_id in left_only_keys[:5]
-    ) + tuple(
-        formatter(protein_id, left_mapping[protein_id])
-        for protein_id in shared_mismatch_keys[:5]
+        formatter(key, left_mapping[key])
+        for key in left_only_keys[:5]
     )
     sample_right_only = tuple(
-        formatter(protein_id, right_mapping[protein_id])
-        for protein_id in right_only_keys[:5]
-    ) + tuple(
-        formatter(protein_id, right_mapping[protein_id])
-        for protein_id in shared_mismatch_keys[:5]
+        formatter(key, right_mapping[key])
+        for key in right_only_keys[:5]
+    )
+    sample_shared_mismatch_left = tuple(
+        formatter(key, left_mapping[key])
+        for key in shared_mismatch_keys[:5]
+    )
+    sample_shared_mismatch_right = tuple(
+        formatter(key, right_mapping[key])
+        for key in shared_mismatch_keys[:5]
     )
 
-    passed = not left_only_keys and not right_only_keys and not shared_mismatch_keys
+    passed = (
+        pass_rule(left_only_keys, right_only_keys, shared_mismatch_keys)
+        if pass_rule is not None
+        else (not left_only_keys and not right_only_keys and not shared_mismatch_keys)
+    )
     return ValidationReport(
         left_path=Path(recreated_path),
         right_path=Path(reference_path),
         passed=passed,
         message="" if passed else message,
+        comparison_unit=comparison_unit,
         left_only_count=len(left_only_keys),
         right_only_count=len(right_only_keys),
         shared_mismatch_count=len(shared_mismatch_keys),
         sample_left_only=sample_left_only,
         sample_right_only=sample_right_only,
+        sample_shared_mismatch_left=sample_shared_mismatch_left,
+        sample_shared_mismatch_right=sample_shared_mismatch_right,
     )
 
 
-def _group_terms_by_protein(
+def _map_term_pairs_to_aspect(
     rows: Iterable[ProteinTermRecord],
-) -> dict[ProteinId, tuple[ProteinTermRecord, ...]]:
-    grouped: dict[ProteinId, list[ProteinTermRecord]] = defaultdict(list)
+) -> dict[tuple[ProteinId, str], str]:
+    pair_to_aspect: dict[tuple[ProteinId, str], str] = {}
     for row in rows:
-        grouped[row.protein_id].append(row)
-    return {
-        protein_id: tuple(
-            sorted(records, key=lambda record: (record.term_id, record.aspect))
-        )
-        for protein_id, records in grouped.items()
-    }
+        key = (row.protein_id, row.term_id)
+        existing_aspect = pair_to_aspect.get(key)
+        if existing_aspect is not None and existing_aspect != row.aspect:
+            raise ValueError(
+                f"Conflicting aspects for protein-term pair {key[0]} / {key[1]}: "
+                f"{existing_aspect} vs {row.aspect}."
+            )
+        pair_to_aspect[key] = row.aspect
+    return pair_to_aspect
 
 
 def _is_close(

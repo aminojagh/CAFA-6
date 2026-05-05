@@ -48,7 +48,11 @@ is_a: GO:0003674 ! molecular_function
 """
 
 
-def build_config(project_root: Path) -> ProjectConfig:
+def build_config(
+    project_root: Path,
+    *,
+    subontologies: tuple[str, ...] = ("MF",),
+) -> ProjectConfig:
     return ProjectConfig(
         go_release="2025-06-01",
         train_uniprot_release="2025_03",
@@ -56,7 +60,7 @@ def build_config(project_root: Path) -> ProjectConfig:
         evaluation_time=date(2026, 3, 17),
         train_taxon_ids=(9606,),
         test_taxon_ids=(),
-        subontologies=("MF",),
+        subontologies=subontologies,
         evidence_codes=("EXP", "IDA"),
         similarity_backend="diamond",
         validation_mode="canonical",
@@ -118,6 +122,7 @@ class ValidationTests(unittest.TestCase):
 
             self.assertTrue(report.passed)
             self.assertEqual(report.message, "")
+            self.assertEqual(report.comparison_unit, "go_id")
             self.assertEqual(report.left_only_count, 0)
             self.assertEqual(report.right_only_count, 0)
             self.assertEqual(report.shared_mismatch_count, 0)
@@ -134,6 +139,7 @@ class ValidationTests(unittest.TestCase):
 
             self.assertFalse(report.passed)
             self.assertIn("release", report.message.lower())
+            self.assertEqual(report.comparison_unit, "go_release")
             self.assertEqual(report.left_only_count, 1)
             self.assertEqual(report.right_only_count, 1)
             self.assertEqual(report.shared_mismatch_count, 0)
@@ -150,6 +156,7 @@ class ValidationTests(unittest.TestCase):
 
             self.assertTrue(report.passed)
             self.assertEqual(report.message, "")
+            self.assertEqual(report.comparison_unit, "protein_id")
             self.assertEqual(report.left_only_count, 0)
             self.assertEqual(report.right_only_count, 0)
             self.assertEqual(report.shared_mismatch_count, 0)
@@ -169,6 +176,7 @@ class ValidationTests(unittest.TestCase):
 
             self.assertTrue(report.passed)
             self.assertEqual(report.message, "")
+            self.assertEqual(report.comparison_unit, "protein_id")
             self.assertEqual(report.left_only_count, 1)
             self.assertEqual(report.right_only_count, 0)
             self.assertEqual(report.shared_mismatch_count, 0)
@@ -204,11 +212,48 @@ class ValidationTests(unittest.TestCase):
 
             self.assertTrue(report.passed)
             self.assertEqual(report.message, "")
+            self.assertEqual(report.comparison_unit, "protein_go_pair")
             self.assertEqual(report.left_only_count, 0)
             self.assertEqual(report.right_only_count, 0)
             self.assertEqual(report.shared_mismatch_count, 0)
 
-    def test_validate_sequence_mapping_reports_mismatch(self) -> None:
+    def test_validate_train_terms_reports_exact_missing_pair(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            obo_path = root / "mini.obo"
+            obo_path.write_text(TEST_OBO, encoding="utf-8")
+            ontology = read_go_obo(obo_path)
+
+            recreated_path = root / "train_terms.tsv"
+            reference_path = root / "reference_train_terms.tsv"
+            recreated_taxonomy_rows = (ProteinTaxonRecord(protein_id="P1", taxon_id=9606),)
+
+            recreated_path.write_text(
+                "EntryID\tterm\taspect\nP1\tGO:0000002\tF\n",
+                encoding="utf-8",
+            )
+            reference_path.write_text(
+                "EntryID\tterm\taspect\nP1\tGO:0000002\tF\nP1\tGO:0008150\tP\n",
+                encoding="utf-8",
+            )
+
+            report = validate_train_terms(
+                recreated_path,
+                reference_path,
+                build_config(root, subontologies=("MF", "BP")),
+                ontology,
+                taxonomy_rows=recreated_taxonomy_rows,
+            )
+
+            self.assertFalse(report.passed)
+            self.assertEqual(report.comparison_unit, "protein_go_pair")
+            self.assertEqual(report.left_only_count, 0)
+            self.assertEqual(report.right_only_count, 1)
+            self.assertEqual(report.shared_mismatch_count, 0)
+            self.assertEqual(report.sample_left_only, ())
+            self.assertIn("P1\tGO:0008150\tP", report.sample_right_only[0])
+
+    def test_validate_sequence_mapping_reports_shared_key_mismatch(self) -> None:
         with TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             recreated_path = root / "recreated.fasta"
@@ -223,7 +268,11 @@ class ValidationTests(unittest.TestCase):
             )
 
             self.assertFalse(report.passed)
-            self.assertIn("P1", report.sample_left_only[0])
+            self.assertEqual(report.comparison_unit, "protein_id")
+            self.assertEqual(report.sample_left_only, ())
+            self.assertEqual(report.sample_right_only, ())
+            self.assertIn("P1", report.sample_shared_mismatch_left[0])
+            self.assertIn("P1", report.sample_shared_mismatch_right[0])
             self.assertIn("mismatch", report.message.lower())
             self.assertEqual(report.left_only_count, 0)
             self.assertEqual(report.right_only_count, 0)
@@ -246,6 +295,7 @@ class ValidationTests(unittest.TestCase):
 
             self.assertTrue(report.passed)
             self.assertEqual(report.message, "")
+            self.assertEqual(report.comparison_unit, "go_id")
             self.assertEqual(report.left_only_count, 0)
             self.assertEqual(report.right_only_count, 0)
             self.assertEqual(report.shared_mismatch_count, 0)
@@ -269,6 +319,9 @@ class ValidationTests(unittest.TestCase):
             self.assertIn("mismatch", report.message.lower())
             self.assertTrue(report.sample_left_only)
             self.assertTrue(report.sample_right_only)
+            self.assertTrue(report.sample_shared_mismatch_left)
+            self.assertTrue(report.sample_shared_mismatch_right)
+            self.assertEqual(report.comparison_unit, "go_id")
             self.assertEqual(report.left_only_count, 0)
             self.assertEqual(report.right_only_count, 1)
             self.assertEqual(report.shared_mismatch_count, 1)

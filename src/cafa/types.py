@@ -90,22 +90,30 @@ class SequenceRecord:
 
 @dataclass(frozen=True, slots=True)
 class ValidationReport:
-    """Simplified canonical validation result for one artifact comparison.
+    """Canonical validation result for one artifact comparison.
 
-    `left_only_count` and `right_only_count` count keys present only on one
-    side of the comparison. `shared_mismatch_count` counts keys present on both
-    sides whose mapped values differ.
+    Counts are always interpreted relative to the validator's chosen
+    `comparison_unit`. For example, a train-taxonomy validator may compare
+    `protein_id` keys, while a train-terms validator may compare exact
+    `(protein_id, go_term_id)` pairs.
+
+    `left_only_count` and `right_only_count` count comparison units present
+    only on one side of the comparison. `shared_mismatch_count` counts
+    comparison units present on both sides whose mapped values differ.
     """
 
     left_path: Path
     right_path: Path
     passed: bool
     message: str = ""
+    comparison_unit: str = "key"
     left_only_count: int = 0
     right_only_count: int = 0
     shared_mismatch_count: int = 0
     sample_left_only: tuple[str, ...] = ()
     sample_right_only: tuple[str, ...] = ()
+    sample_shared_mismatch_left: tuple[str, ...] = ()
+    sample_shared_mismatch_right: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
