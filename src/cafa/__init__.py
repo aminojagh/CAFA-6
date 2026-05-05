@@ -35,7 +35,7 @@ from .sources import (
     resolve_uniprot_sprot_snapshot,
     sha256_file,
 )
-from .train import extract_train_taxonomy_records
+from .train import extract_train_taxonomy_records, extract_train_term_records
 from .validation import (
     filter_reference_sequence_records,
     filter_reference_train_taxonomy_rows,
@@ -79,6 +79,7 @@ __all__ = [
     "download_source",
     "extract_tar_gz_member",
     "extract_train_taxonomy_records",
+    "extract_train_term_records",
     "ProteinId",
     "ProteinTaxonRecord",
     "ProteinTermRecord",

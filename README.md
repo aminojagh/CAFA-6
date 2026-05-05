@@ -19,6 +19,7 @@ The repository currently includes the core foundations for the larger pipeline:
 - shared data and configuration types
 - source snapshot resolution utilities
 - Swiss-Prot train taxonomy extraction from the pinned 2025_03 release archive
+- Swiss-Prot train term extraction with evidence filtering and ontology-derived GO canonicalization
 - Gene Ontology parsing, canonicalization, traversal, and propagation helpers
 - deterministic readers and writers for core artifact formats
 - validation utilities and automated unit tests
@@ -53,7 +54,7 @@ export PYTHONPATH=src
 
 ## Development Workflow
 
-The codebase is being built incrementally. `main.ipynb` is the operational notebook for the stages implemented so far: it uses pinned real sources, recreates actual artifacts under `recreated_comp_data/`, and validates them against the reference data. The broader pipeline layers for train terms, train sequences, test extraction, benchmark assembly, training, evaluation, and inference will be added to that same flow as they are implemented.
+The codebase is being built incrementally. `main.ipynb` is the operational notebook for the stages implemented so far: it uses pinned real sources, recreates actual artifacts under `recreated_comp_data/`, and validates them against the reference data. The notebook currently covers the recreated GO ontology, `Train/train_taxonomy.tsv`, and `Train/train_terms.tsv`. The broader pipeline layers for train sequences, test extraction, benchmark assembly, training, evaluation, and inference will be added to that same flow as they are implemented.
 
 ## Testing
 

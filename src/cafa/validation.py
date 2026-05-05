@@ -70,6 +70,8 @@ def validate_train_taxonomy(
         right_mapping=reference_mapping,
         formatter=lambda protein_id, taxon_id: f"{protein_id}\t{taxon_id}",
     )
+    # TODO: this has to be handled inside a single logic.
+    # maybe we can specify the validation rule as an argument passed to `_mapping_comparison_report`
     taxonomy_passed = report.right_only_count == 0 and report.shared_mismatch_count == 0
     return ValidationReport(
         left_path=report.left_path,
