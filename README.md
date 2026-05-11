@@ -31,7 +31,8 @@ The repository currently includes the core foundations for the larger pipeline:
 src/cafa/                 Project source code
 tests/                    Automated tests
 main.ipynb                Primary project notebook
-notebooks/                Experimental and exploratory notebooks
+eda/                      Focused diagnostic notebooks
+notebooks/                Legacy exploratory material not used by the main workflow
 requirements.txt          Python dependencies
 LICENSE                   Apache 2.0 license
 ```
@@ -54,7 +55,7 @@ export PYTHONPATH=src
 
 ## Development Workflow
 
-The codebase is being built incrementally. `main.ipynb` is the operational notebook for the stages implemented so far: it uses pinned real sources, recreates actual artifacts under `recreated_comp_data/`, and validates them against the reference data. The notebook currently covers the recreated GO ontology, `Train/train_taxonomy.tsv`, and `Train/train_terms.tsv`. The broader pipeline layers for train sequences, test extraction, benchmark assembly, training, evaluation, and inference will be added to that same flow as they are implemented.
+The codebase is being built incrementally. `main.ipynb` is the operational notebook for the main pipeline stages implemented so far: it uses pinned real sources, recreates actual artifacts under `recreated_comp_data/`, and validates them against the reference data. The notebook currently covers the recreated GO ontology, `Train/train_taxonomy.tsv`, and `Train/train_terms.tsv`. Focused investigations that are not part of the main pipeline should live in dedicated notebooks under `eda/`. The broader pipeline layers for train sequences, test extraction, benchmark assembly, training, evaluation, and inference will be added to the main flow as they are implemented.
 
 ## Testing
 
